@@ -24,7 +24,6 @@ def build_hierarchy(data):
         "L7": []
     }
     
-    # Iterate through each row to build the hierarchy
     for index, row in data.iterrows():
         hierarchy['Full URL'].append(row['Full URL'])
         hierarchy['Page Topic'].append(row['Page Topic'])
@@ -36,23 +35,28 @@ def build_hierarchy(data):
                 hierarchy[level_col].append(row[level_col])
                 last_valid_level = level
             else:
-                hierarchy[level_col].append(None)
+                break  # Stop at the first empty level
         
-        # Ensure all levels after the last valid one are None
+        # Fill remaining levels with the last valid value to make it a leaf
         if last_valid_level is not None:
+            last_value = hierarchy[f'L{last_valid_level}'][-1]
             for level in range(last_valid_level + 1, 8):
-                hierarchy[f'L{level}'][-1] = None
+                hierarchy[f'L{level}'].append(last_value)
+        else:
+            # If no valid levels, fill all with Page Topic
+            for level in range(1, 8):
+                hierarchy[f'L{level}'].append(row['Page Topic'])
     
     # Convert to DataFrame
     hierarchy_df = pd.DataFrame(hierarchy)
-
-    # Remove rows where all levels are None (except Full URL and Page Topic)
-    hierarchy_df = hierarchy_df[hierarchy_df[['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']].notna().any(axis=1)]
-
+    
     return hierarchy_df
 
 # Function to generate the Plotly Sunburst Chart
 def create_sunburst(hierarchy_df):
+    # Replace empty strings with None
+    hierarchy_df = hierarchy_df.replace('', None)
+    
     # Create Sunburst chart
     fig = px.sunburst(
         hierarchy_df,
@@ -62,6 +66,10 @@ def create_sunburst(hierarchy_df):
         branchvalues='total',
         title='Hierarchical Visualization of URLs - Sunburst'
     )
+    
+    # Remove empty "" labels which can cause issues
+    fig.update_traces(textinfo='label', hovertemplate='%{label}<br>%{value}')
+    
     return fig
 
 # Load data
