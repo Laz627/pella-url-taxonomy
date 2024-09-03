@@ -1,89 +1,83 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 
 # Load the data from the Excel file
 @st.cache_data
 def load_data():
-    # Update the file path if needed
-    file_path = 'URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm'
+    # Update the file path to match your GitHub repository structure
+    file_path = 'URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm'  # Ensure this path matches where your file is stored
     data = pd.read_excel(file_path)
     return data
 
-# Create a function to build hierarchical data for Plotly Treemap
+# Create a function to build hierarchical data for Plotly Sunburst
 def build_hierarchy(data):
     hierarchy = {
-        "labels": [],
-        "parents": [],
-        "ids": [],
-        "urls": []
+        "Full URL": [],
+        "Page Topic": [],
+        "L1": [],
+        "L2": [],
+        "L3": [],
+        "L4": [],
+        "L5": [],
+        "L6": [],
+        "L7": []
     }
     
     # Iterate through each row to build the hierarchy
     for index, row in data.iterrows():
-        # Extract the Full URL, Page Topic, and hierarchical levels (L0, L1, L2, etc.)
-        full_url = row['Full URL']
-        page_topic = row['Page Topic']
+        # Extract the Full URL, Page Topic, and hierarchical levels (L1, L2, L3, etc.)
+        hierarchy['Full URL'].append(row['Full URL'])
+        hierarchy['Page Topic'].append(row['Page Topic'])
         
-        # Add the root node
-        hierarchy['labels'].append(page_topic)
-        hierarchy['parents'].append('')
-        hierarchy['ids'].append(page_topic)
-        hierarchy['urls'].append(full_url)
-        
-        # Add child nodes (L1, L2, L3, etc.)
-        for level in range(1, len(row) - 2):  # Exclude 'Full URL' and 'Page Topic'
-            if not pd.isna(row[f'L{level}']):
-                current_label = row[f'L{level}']
-                parent_label = row[f'L{level - 1}'] if level > 1 else page_topic
-                
-                # Only add if not already in labels
-                if current_label not in hierarchy['labels']:
-                    hierarchy['labels'].append(current_label)
-                    hierarchy['parents'].append(parent_label)
-                    hierarchy['ids'].append(current_label)
-                    hierarchy['urls'].append(full_url)
+        # Add levels (L1 to L7)
+        for level in range(1, 8):
+            level_col = f'L{level}'
+            if level_col in row:
+                hierarchy[level_col].append(row.get(level_col, None))
+            else:
+                hierarchy[level_col].append(None)
     
-    return hierarchy
+    return pd.DataFrame(hierarchy)
 
-# Function to generate the Plotly Treemap
-def create_treemap(hierarchy):
-    fig = go.Figure(go.Treemap(
-        labels=hierarchy['labels'],
-        parents=hierarchy['parents'],
-        ids=hierarchy['ids'],
-        hovertext=hierarchy['urls'],
-        customdata=hierarchy['urls'],
-        hoverinfo='label+text',
-        marker=dict(colorscale='Viridis'),
-    ))
-
-    fig.update_traces(root_color="lightgrey")
-    
+# Function to generate the Plotly Sunburst Chart
+def create_sunburst(hierarchy_df):
+    fig = px.sunburst(
+        hierarchy_df,
+        path=['Page Topic', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
+        values=None,
+        hover_name='Full URL',
+        color='Page Topic',
+        branchvalues='total',
+        title='Hierarchical Visualization of URLs - Sunburst'
+    )
     return fig
 
 # Load data
 data = load_data()
 
 # Build hierarchical data
-hierarchy = build_hierarchy(data)
+hierarchy_df = build_hierarchy(data)
 
 # Streamlit UI
-st.title('Hierarchical Visualization of URLs')
+st.title('Hierarchical Visualization of URLs using Sunburst Chart')
 
 st.markdown("""
-Click on a node in the treemap to navigate to the corresponding URL.
+Click on a node in the Sunburst chart to drill down and explore the hierarchy.
 """)
 
-# Create and display the treemap
-fig = create_treemap(hierarchy)
-
-def on_click(trace, points, state):
-    url = points.customdata[points.point_inds[0]]
-    st.write(f"Opening URL: {url}")
-    st.write(f"<script>window.open('{url}')</script>", unsafe_allow_html=True)
-
-fig.data[0].on_click(on_click)
+# Create and display the Sunburst chart
+fig = create_sunburst(hierarchy_df)
 
 # Display the plot
 st.plotly_chart(fig)
+
+# Provide user interaction for opening URLs
+st.markdown("""
+### Click on the URLs below to navigate
+""")
+
+selected_url = st.selectbox('Select URL to open', hierarchy_df['Full URL'].unique())
+if st.button('Open URL'):
+    st.write(f"Opening URL: {selected_url}")
+    st.write(f"<script>window.open('{selected_url}');</script>", unsafe_allow_html=True)
