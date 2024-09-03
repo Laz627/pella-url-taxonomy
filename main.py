@@ -7,7 +7,7 @@ from io import BytesIO
 @st.cache_data
 def load_data():
     # GitHub raw content URL for your Excel file
-    url = "https://github.com/your-username/your-repo/raw/main/URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
+    url = "URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
     
     response = requests.get(url)
     content = BytesIO(response.content)
