@@ -12,8 +12,9 @@ def load_data():
 
 # Create a function to build hierarchical data for Graphviz
 def build_hierarchy_graph(data):
-    dot = Digraph()
-    dot.attr(compound='true', rankdir='LR')  # Left to Right orientation
+    dot = Digraph(format='png')
+    dot.attr('node', shape='box', style='filled', color='lightgrey', fontname='Helvetica', fontsize='10')
+    dot.attr('edge', arrowhead='open', color='black', fontname='Helvetica')
 
     # Track added nodes to avoid duplication
     added_nodes = set()
@@ -31,12 +32,13 @@ def build_hierarchy_graph(data):
         for level in range(1, 8):
             level_col = f'L{level}'
             child = row.get(level_col)
-            if pd.notna(child):
-                if child not in added_nodes:
-                    dot.node(child, child)  # Add child node
-                    added_nodes.add(child)
-                dot.edge(parent, child)  # Create edge between parent and child
-                parent = child  # Update parent for the next level
+            if pd.notna(child) and child != '':
+                unique_child = f"{child}_{index}"  # Ensure unique ID for nodes
+                if unique_child not in added_nodes:
+                    dot.node(unique_child, child)  # Add child node
+                    added_nodes.add(unique_child)
+                dot.edge(parent, unique_child)  # Create edge between parent and child
+                parent = unique_child  # Update parent for the next level
 
     return dot
 
@@ -50,7 +52,7 @@ hierarchy_graph = build_hierarchy_graph(data)
 st.title('Hierarchical Visualization of URLs using Collapsible Tree Diagram')
 
 st.markdown("""
-The collapsible tree diagram below allows you to explore the hierarchy. Click on the nodes to collapse or expand them.
+The tree diagram below allows you to explore the hierarchy. Click on the nodes to collapse or expand them.
 """)
 
 # Render the Graphviz tree
