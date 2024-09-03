@@ -1,11 +1,20 @@
 import streamlit as st
 import pandas as pd
 from streamlit_agraph import agraph, Node, Edge, Config
+import requests
+from io import BytesIO
 
 @st.cache_data
 def load_data():
-    # Load your data here
-    pass
+    # GitHub raw content URL for your Excel file
+    url = "https://github.com/your-username/your-repo/raw/main/URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
+    
+    response = requests.get(url)
+    content = BytesIO(response.content)
+    
+    # Read the Excel file
+    data = pd.read_excel(content, engine='openpyxl')
+    return data
 
 def create_tree_structure(data):
     nodes = []
@@ -32,30 +41,35 @@ def create_tree_structure(data):
 # Main app
 st.title('Website Taxonomy Visualization')
 
-data = load_data()
+try:
+    data = load_data()
 
-nodes, edges = create_tree_structure(data)
+    nodes, edges = create_tree_structure(data)
 
-config = Config(width=800,
-                height=600,
-                directed=True,
-                physics=True,
-                hierarchical=True,
-                nodeHighlightBehavior=True, 
-                highlightColor="#F7A7A6",
-                collapsible=True)
+    config = Config(width=800,
+                    height=600,
+                    directed=True,
+                    physics=True,
+                    hierarchical=True,
+                    nodeHighlightBehavior=True, 
+                    highlightColor="#F7A7A6",
+                    collapsible=True)
 
-agraph(nodes=nodes, 
-       edges=edges, 
-       config=config)
+    agraph(nodes=nodes, 
+           edges=edges, 
+           config=config)
 
-# Add a search functionality
-search_term = st.text_input("Search for a page or section:")
-if search_term:
-    filtered_nodes = [node for node in nodes if search_term.lower() in node.label.lower()]
-    if filtered_nodes:
-        st.write("Matching nodes:")
-        for node in filtered_nodes:
-            st.write(node.label)
-    else:
-        st.write("No matching nodes found.")
+    # Add a search functionality
+    search_term = st.text_input("Search for a page or section:")
+    if search_term:
+        filtered_nodes = [node for node in nodes if search_term.lower() in node.label.lower()]
+        if filtered_nodes:
+            st.write("Matching nodes:")
+            for node in filtered_nodes:
+                st.write(node.label)
+        else:
+            st.write("No matching nodes found.")
+
+except Exception as e:
+    st.error(f"An error occurred: {str(e)}")
+    st.error("Please check if the GitHub URL is correct and the file is accessible.")
