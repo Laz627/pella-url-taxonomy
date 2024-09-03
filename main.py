@@ -26,27 +26,28 @@ def build_hierarchy(data):
     
     # Iterate through each row to build the hierarchy
     for index, row in data.iterrows():
-        # Extract the Full URL, Page Topic, and hierarchical levels (L1, L2, L3, etc.)
         hierarchy['Full URL'].append(row['Full URL'])
         hierarchy['Page Topic'].append(row['Page Topic'])
         
-        # Add levels (L1 to L7), filling only until the first non-empty level is encountered
+        last_valid_level = None
         for level in range(1, 8):
             level_col = f'L{level}'
-            # Check if this level exists in the data and is not NaN
             if level_col in row and pd.notna(row[level_col]):
                 hierarchy[level_col].append(row[level_col])
+                last_valid_level = level
             else:
-                # Fill remaining levels with None if there are no more children to avoid "non-leaves" errors
                 hierarchy[level_col].append(None)
+        
+        # Ensure all levels after the last valid one are None
+        if last_valid_level is not None:
+            for level in range(last_valid_level + 1, 8):
+                hierarchy[f'L{level}'][-1] = None
     
     # Convert to DataFrame
     hierarchy_df = pd.DataFrame(hierarchy)
 
-    # Remove non-leaf nodes with missing children (invalid hierarchical paths)
-    for level in ['L1', 'L2', 'L3', 'L4', 'L5', 'L6']:
-        # If a node at this level has children but is missing any of them, it is considered invalid
-        hierarchy_df = hierarchy_df[~((hierarchy_df[level].notna()) & (hierarchy_df[level].shift(-1).isna()))]
+    # Remove rows where all levels are None (except Full URL and Page Topic)
+    hierarchy_df = hierarchy_df[hierarchy_df[['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']].notna().any(axis=1)]
 
     return hierarchy_df
 
