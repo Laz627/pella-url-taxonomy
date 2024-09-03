@@ -3,3 +3,4 @@ streamlit-agraph
 pandas 
 openpyxl 
 requests
+xlrd
