@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from graphviz import Digraph
+from pyvis.network import Network
+import streamlit.components.v1 as components
 
 # Load the data from the Excel file
 @st.cache_data
@@ -10,12 +11,11 @@ def load_data():
     data = pd.read_excel(file_path)
     return data
 
-# Create a function to build hierarchical data for Graphviz
-def build_hierarchy_graph(data):
-    dot = Digraph(format='png')
-    dot.attr('node', shape='box', style='filled', color='lightgrey', fontname='Helvetica', fontsize='10')
-    dot.attr('edge', arrowhead='open', color='black', fontname='Helvetica')
-
+# Create a function to build hierarchical data for Pyvis Network
+def build_hierarchy_network(data):
+    # Initialize the Pyvis Network
+    net = Network(height='800px', width='100%', directed=True)
+    
     # Track added nodes to avoid duplication
     added_nodes = set()
 
@@ -24,7 +24,7 @@ def build_hierarchy_graph(data):
         # Root node: Page Topic
         root = row['Page Topic']
         if root not in added_nodes:
-            dot.node(root, root)  # Add root node
+            net.add_node(root, label=root, title=row['Full URL'])
             added_nodes.add(root)
 
         # Add hierarchical levels
@@ -35,28 +35,56 @@ def build_hierarchy_graph(data):
             if pd.notna(child) and child != '':
                 unique_child = f"{child}_{index}"  # Ensure unique ID for nodes
                 if unique_child not in added_nodes:
-                    dot.node(unique_child, child)  # Add child node
+                    net.add_node(unique_child, label=child, title=row['Full URL'])
                     added_nodes.add(unique_child)
-                dot.edge(parent, unique_child)  # Create edge between parent and child
+                net.add_edge(parent, unique_child)  # Create edge between parent and child
                 parent = unique_child  # Update parent for the next level
 
-    return dot
+    # Customize network options for better visualization
+    net.set_options("""
+    var options = {
+      "nodes": {
+        "color": {
+          "border": "rgba(0,0,0,1)",
+          "background": "rgba(220,220,220,1)"
+        },
+        "font": {
+          "size": 12
+        }
+      },
+      "edges": {
+        "color": {
+          "color": "rgba(150,150,150,1)"
+        }
+      },
+      "interaction": {
+        "hover": true,
+        "navigationButtons": true,
+        "keyboard": true
+      }
+    }
+    """)
+    
+    return net
 
 # Load data
 data = load_data()
 
-# Build hierarchical data graph
-hierarchy_graph = build_hierarchy_graph(data)
+# Build hierarchical data network
+hierarchy_network = build_hierarchy_network(data)
+
+# Save and display the Pyvis network in Streamlit
+hierarchy_network.save_graph('network.html')
 
 # Streamlit UI
 st.title('Hierarchical Visualization of URLs using Collapsible Tree Diagram')
 
 st.markdown("""
-The tree diagram below allows you to explore the hierarchy. Click on the nodes to collapse or expand them.
+The collapsible tree diagram below allows you to explore the hierarchy. Click on the nodes to collapse or expand them.
 """)
 
-# Render the Graphviz tree
-st.graphviz_chart(hierarchy_graph)
+# Display the network using Streamlit's components
+components.html(open('network.html', 'r').read(), height=800)
 
 # Provide user interaction for opening URLs
 st.markdown("""
