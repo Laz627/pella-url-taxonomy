@@ -3,18 +3,28 @@ import pandas as pd
 from streamlit_agraph import agraph, Node, Edge, Config
 import requests
 from io import BytesIO
+import xlrd
 
 @st.cache_data
 def load_data():
     # GitHub raw content URL for your Excel file
-    url = "URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
+    url = "https://github.com/Laz627/pella-url-taxonomy/blob/main/URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
     
     response = requests.get(url)
     content = BytesIO(response.content)
     
-    # Read the Excel file
-    data = pd.read_excel(content, engine='openpyxl')
-    return data
+    # Read the Excel file using xlrd
+    workbook = xlrd.open_workbook(file_contents=content.getvalue())
+    sheet = workbook.sheet_by_index(0)  # Assuming data is in the first sheet
+    
+    # Convert to DataFrame
+    data = []
+    headers = sheet.row_values(0)
+    for row_idx in range(1, sheet.nrows):
+        data.append(sheet.row_values(row_idx))
+    
+    df = pd.DataFrame(data, columns=headers)
+    return df
 
 def create_tree_structure(data):
     nodes = []
@@ -27,10 +37,10 @@ def create_tree_structure(data):
     for _, row in data.iterrows():
         parent = "root"
         for level in ['Page Topic', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']:
-            if pd.notna(row[level]):
+            if pd.notna(row[level]) and row[level] != '':
                 node_id = f"{parent}_{row[level]}"
                 if not any(node.id == node_id for node in nodes):
-                    nodes.append(Node(id=node_id, label=row[level], size=15))
+                    nodes.append(Node(id=node_id, label=str(row[level]), size=15))
                     edges.append(Edge(source=parent, target=node_id))
                 parent = node_id
             else:
