@@ -3,28 +3,18 @@ import pandas as pd
 from streamlit_agraph import agraph, Node, Edge, Config
 import requests
 from io import BytesIO
-import xlrd
 
 @st.cache_data
 def load_data():
     # GitHub raw content URL for your Excel file
-    url = "https://github.com/Laz627/pella-url-taxonomy/blob/main/URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
+    url = "URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm"
     
     response = requests.get(url)
     content = BytesIO(response.content)
     
-    # Read the Excel file using xlrd
-    workbook = xlrd.open_workbook(file_contents=content.getvalue())
-    sheet = workbook.sheet_by_index(0)  # Assuming data is in the first sheet
-    
-    # Convert to DataFrame
-    data = []
-    headers = sheet.row_values(0)
-    for row_idx in range(1, sheet.nrows):
-        data.append(sheet.row_values(row_idx))
-    
-    df = pd.DataFrame(data, columns=headers)
-    return df
+    # Read the Excel file
+    data = pd.read_excel(content, engine='openpyxl')
+    return data
 
 def create_tree_structure(data):
     nodes = []
@@ -53,6 +43,8 @@ st.title('Website Taxonomy Visualization')
 
 try:
     data = load_data()
+    st.write("Data loaded successfully. Shape:", data.shape)
+    st.write("Columns:", data.columns.tolist())
 
     nodes, edges = create_tree_structure(data)
 
