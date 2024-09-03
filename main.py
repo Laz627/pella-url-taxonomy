@@ -1,102 +1,61 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+from streamlit_agraph import agraph, Node, Edge, Config
 
-# Load the data from the Excel file
 @st.cache_data
 def load_data():
-    # Update the file path to match your GitHub repository structure
-    file_path = 'URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm'  # Ensure this path matches where your file is stored
-    data = pd.read_excel(file_path)
-    return data
+    # Load your data here
+    pass
 
-# Create a function to clean the data and build a valid hierarchy for Plotly Sunburst
-def build_hierarchy(data):
-    hierarchy = {
-        "Full URL": [],
-        "Page Topic": [],
-        "L1": [],
-        "L2": [],
-        "L3": [],
-        "L4": [],
-        "L5": [],
-        "L6": [],
-        "L7": []
-    }
+def create_tree_structure(data):
+    nodes = []
+    edges = []
     
-    for index, row in data.iterrows():
-        hierarchy['Full URL'].append(row['Full URL'])
-        hierarchy['Page Topic'].append(row['Page Topic'])
-        
-        last_valid_level = None
-        for level in range(1, 8):
-            level_col = f'L{level}'
-            if level_col in row and pd.notna(row[level_col]):
-                hierarchy[level_col].append(row[level_col])
-                last_valid_level = level
+    # Create a root node
+    root_node = Node(id="root", label="Website Root", size=20)
+    nodes.append(root_node)
+    
+    for _, row in data.iterrows():
+        parent = "root"
+        for level in ['Page Topic', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']:
+            if pd.notna(row[level]):
+                node_id = f"{parent}_{row[level]}"
+                if not any(node.id == node_id for node in nodes):
+                    nodes.append(Node(id=node_id, label=row[level], size=15))
+                    edges.append(Edge(source=parent, target=node_id))
+                parent = node_id
             else:
-                break  # Stop at the first empty level
-        
-        # Fill remaining levels with the last valid value to make it a leaf
-        if last_valid_level is not None:
-            last_value = hierarchy[f'L{last_valid_level}'][-1]
-            for level in range(last_valid_level + 1, 8):
-                hierarchy[f'L{level}'].append(last_value)
-        else:
-            # If no valid levels, fill all with Page Topic
-            for level in range(1, 8):
-                hierarchy[f'L{level}'].append(row['Page Topic'])
+                break
     
-    # Convert to DataFrame
-    hierarchy_df = pd.DataFrame(hierarchy)
-    
-    return hierarchy_df
+    return nodes, edges
 
-# Function to generate the Plotly Sunburst Chart
-def create_sunburst(hierarchy_df):
-    # Replace empty strings with None
-    hierarchy_df = hierarchy_df.replace('', None)
-    
-    # Create Sunburst chart
-    fig = px.sunburst(
-        hierarchy_df,
-        path=['Page Topic', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
-        hover_name='Full URL',
-        color='Page Topic',
-        branchvalues='total',
-        title='Hierarchical Visualization of URLs - Sunburst'
-    )
-    
-    # Remove empty "" labels which can cause issues
-    fig.update_traces(textinfo='label', hovertemplate='%{label}<br>%{value}')
-    
-    return fig
+# Main app
+st.title('Website Taxonomy Visualization')
 
-# Load data
 data = load_data()
 
-# Build hierarchical data
-hierarchy_df = build_hierarchy(data)
+nodes, edges = create_tree_structure(data)
 
-# Streamlit UI
-st.title('Hierarchical Visualization of URLs using Sunburst Chart')
+config = Config(width=800,
+                height=600,
+                directed=True,
+                physics=True,
+                hierarchical=True,
+                nodeHighlightBehavior=True, 
+                highlightColor="#F7A7A6",
+                collapsible=True)
 
-st.markdown("""
-Click on a node in the Sunburst chart to drill down and explore the hierarchy.
-""")
+agraph(nodes=nodes, 
+       edges=edges, 
+       config=config)
 
-# Create and display the Sunburst chart
-fig = create_sunburst(hierarchy_df)
-
-# Display the plot
-st.plotly_chart(fig)
-
-# Provide user interaction for opening URLs
-st.markdown("""
-### Click on the URLs below to navigate
-""")
-
-selected_url = st.selectbox('Select URL to open', hierarchy_df['Full URL'].unique())
-if st.button('Open URL'):
-    st.write(f"Opening URL: {selected_url}")
-    st.write(f"<script>window.open('{selected_url}');</script>", unsafe_allow_html=True)
+# Add a search functionality
+search_term = st.text_input("Search for a page or section:")
+if search_term:
+    filtered_nodes = [node for node in nodes if search_term.lower() in node.label.lower()]
+    if filtered_nodes:
+        st.write("Matching nodes:")
+        for node in filtered_nodes:
+            st.write(node.label)
+    else:
+        st.write("No matching nodes found.")
