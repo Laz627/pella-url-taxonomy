@@ -30,22 +30,28 @@ def build_hierarchy(data):
         hierarchy['Full URL'].append(row['Full URL'])
         hierarchy['Page Topic'].append(row['Page Topic'])
         
-        # Add levels (L1 to L7)
+        # Add levels (L1 to L7), ensuring any level is filled with 'None' if it is missing children
         for level in range(1, 8):
             level_col = f'L{level}'
-            if level_col in row:
-                hierarchy[level_col].append(row.get(level_col, None))
+            if pd.notna(row.get(level_col)):
+                hierarchy[level_col].append(row[level_col])
             else:
+                # Fill remaining levels with None if there are no more children to avoid "non-leaves" errors
                 hierarchy[level_col].append(None)
     
     return pd.DataFrame(hierarchy)
 
 # Function to generate the Plotly Sunburst Chart
 def create_sunburst(hierarchy_df):
+    # Filter out rows where intermediate levels are empty to avoid errors
+    for level in ['L7', 'L6', 'L5', 'L4', 'L3', 'L2', 'L1']:
+        # Set to None if it is a non-leaf node with no children
+        hierarchy_df.loc[hierarchy_df[level].isna(), level] = None
+        
+    # Create Sunburst chart
     fig = px.sunburst(
         hierarchy_df,
         path=['Page Topic', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'],
-        values=None,
         hover_name='Full URL',
         color='Page Topic',
         branchvalues='total',
