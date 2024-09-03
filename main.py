@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
-from pyvis.network import Network
-import streamlit.components.v1 as components
+from bokeh.plotting import figure, from_networkx
+from bokeh.models import Plot, Range1d, Circle, MultiLine, HoverTool
+from bokeh.palettes import Spectral8
+from bokeh.io import show
+import networkx as nx
 
 # Load the data from the Excel file
 @st.cache_data
@@ -11,11 +14,10 @@ def load_data():
     data = pd.read_excel(file_path)
     return data
 
-# Create a function to build hierarchical data for Pyvis Network
-def build_hierarchy_network(data, max_depth=3):
-    # Initialize the Pyvis Network with performance settings
-    net = Network(height='800px', width='100%', directed=True, notebook=False)
-    net.barnes_hut(gravity=-80000, central_gravity=0.3, spring_length=100, spring_strength=0.1)
+# Create a function to build hierarchical data for Bokeh and NetworkX
+def build_hierarchy_graph(data):
+    # Create a directed graph
+    G = nx.DiGraph()
     
     # Track added nodes to avoid duplication
     added_nodes = set()
@@ -25,70 +27,46 @@ def build_hierarchy_network(data, max_depth=3):
         # Root node: Page Topic
         root = row['Page Topic']
         if root not in added_nodes:
-            net.add_node(root, label=root, title=row['Full URL'])
+            G.add_node(root, title=row['Full URL'])  # Add root node
             added_nodes.add(root)
 
-        # Add hierarchical levels up to the specified max_depth
+        # Add hierarchical levels
         parent = root  # Start with the root node as the parent
-        for level in range(1, max_depth + 1):
+        for level in range(1, 8):
             level_col = f'L{level}'
             child = row.get(level_col)
             if pd.notna(child) and child != '':
                 unique_child = f"{child}_{index}"  # Ensure unique ID for nodes
                 if unique_child not in added_nodes:
-                    net.add_node(unique_child, label=child, title=row['Full URL'])
+                    G.add_node(unique_child, title=row['Full URL'])  # Add child node
                     added_nodes.add(unique_child)
-                net.add_edge(parent, unique_child)  # Create edge between parent and child
+                G.add_edge(parent, unique_child)  # Create edge between parent and child
                 parent = unique_child  # Update parent for the next level
 
-    # Customize network options for better visualization
-    net.set_options("""
-    var options = {
-      "nodes": {
-        "color": {
-          "border": "rgba(0,0,0,1)",
-          "background": "rgba(220,220,220,1)"
-        },
-        "font": {
-          "size": 12
-        }
-      },
-      "edges": {
-        "color": {
-          "color": "rgba(150,150,150,1)"
-        }
-      },
-      "interaction": {
-        "hover": true,
-        "navigationButtons": true,
-        "keyboard": true
-      }
-    }
-    """)
-    
-    return net
+    return G
 
 # Load data
 data = load_data()
 
+# Build hierarchical data graph
+G = build_hierarchy_graph(data)
+
+# Plotting with Bokeh
+plot = Plot(width=800, height=800, x_range=Range1d(-1.1,1.1), y_range=Range1d(-1.1,1.1))
+plot.title.text = "Hierarchical URL Visualization"
+
+# Add node renderer
+graph_renderer = from_networkx(G, nx.spring_layout, scale=2, center=(0,0))
+plot.renderers.append(graph_renderer)
+
+# Add HoverTool to display URL on hover
+hover = HoverTool(tooltips=[("URL", "@title")])
+plot.add_tools(hover)
+
 # Streamlit UI
-st.title('Hierarchical Visualization of URLs using Collapsible Tree Diagram')
+st.title('Hierarchical Visualization of URLs using Bokeh')
 
-st.markdown("""
-The collapsible tree diagram below allows you to explore the hierarchy. Use the controls to adjust the depth of the tree to display.
-""")
-
-# User input to control the depth of the hierarchy displayed
-max_depth = st.slider('Select depth of the hierarchy to display', min_value=1, max_value=7, value=3)
-
-# Build hierarchical data network with user-specified depth
-hierarchy_network = build_hierarchy_network(data, max_depth=max_depth)
-
-# Save and display the Pyvis network in Streamlit
-hierarchy_network.save_graph('network.html')
-
-# Display the network using Streamlit's components
-components.html(open('network.html', 'r').read(), height=800)
+st.bokeh_chart(plot)
 
 # Provide user interaction for opening URLs
 st.markdown("""
