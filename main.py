@@ -12,9 +12,10 @@ def load_data():
     return data
 
 # Create a function to build hierarchical data for Pyvis Network
-def build_hierarchy_network(data):
-    # Initialize the Pyvis Network
-    net = Network(height='800px', width='100%', directed=True)
+def build_hierarchy_network(data, max_depth=3):
+    # Initialize the Pyvis Network with performance settings
+    net = Network(height='800px', width='100%', directed=True, notebook=False)
+    net.barnes_hut(gravity=-80000, central_gravity=0.3, spring_length=100, spring_strength=0.1)
     
     # Track added nodes to avoid duplication
     added_nodes = set()
@@ -27,9 +28,9 @@ def build_hierarchy_network(data):
             net.add_node(root, label=root, title=row['Full URL'])
             added_nodes.add(root)
 
-        # Add hierarchical levels
+        # Add hierarchical levels up to the specified max_depth
         parent = root  # Start with the root node as the parent
-        for level in range(1, 8):
+        for level in range(1, max_depth + 1):
             level_col = f'L{level}'
             child = row.get(level_col)
             if pd.notna(child) and child != '':
@@ -70,18 +71,21 @@ def build_hierarchy_network(data):
 # Load data
 data = load_data()
 
-# Build hierarchical data network
-hierarchy_network = build_hierarchy_network(data)
-
-# Save and display the Pyvis network in Streamlit
-hierarchy_network.save_graph('network.html')
-
 # Streamlit UI
 st.title('Hierarchical Visualization of URLs using Collapsible Tree Diagram')
 
 st.markdown("""
-The collapsible tree diagram below allows you to explore the hierarchy. Click on the nodes to collapse or expand them.
+The collapsible tree diagram below allows you to explore the hierarchy. Use the controls to adjust the depth of the tree to display.
 """)
+
+# User input to control the depth of the hierarchy displayed
+max_depth = st.slider('Select depth of the hierarchy to display', min_value=1, max_value=7, value=3)
+
+# Build hierarchical data network with user-specified depth
+hierarchy_network = build_hierarchy_network(data, max_depth=max_depth)
+
+# Save and display the Pyvis network in Streamlit
+hierarchy_network.save_graph('network.html')
 
 # Display the network using Streamlit's components
 components.html(open('network.html', 'r').read(), height=800)
