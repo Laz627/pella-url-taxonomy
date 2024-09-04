@@ -38,7 +38,7 @@ def add_to_tree(tree, path, url):
     current = tree
     for component in path:
         if component not in current:
-            current[component] = {'_urls': [], '_count': 0, '_children': {}}
+            current[component] = {'_urls': [], '_count': 0}
         current = current[component]
         current['_count'] += 1
     current['_urls'].append(url)
@@ -46,18 +46,14 @@ def add_to_tree(tree, path, url):
 def create_markmap_content(tree, level=0):
     content = ""
     for key, value in sorted(tree.items()):
-        if key not in ['_urls', '_count', '_children']:
+        if key not in ['_urls', '_count']:
             url_count = value['_count']
-            content += f"{'  ' * level}- {key} ({url_count})"
-            if level < 3:  # Only expand up to level 3
-                content += "\n"
-                if '_urls' in value and value['_urls']:
-                    content += f"{'  ' * (level + 1)}- URLs\n"
-                    for url in sorted(value['_urls']):
-                        content += f"{'  ' * (level + 2)}- {url}\n"
-                content += create_markmap_content(value['_children'], level + 1)
-            else:
-                content += " ...\n"  # Indicate there's more content
+            content += f"{'  ' * level}- {key} ({url_count})\n"
+            if '_urls' in value and value['_urls']:
+                content += f"{'  ' * (level + 1)}- URLs\n"
+                for url in sorted(value['_urls']):
+                    content += f"{'  ' * (level + 2)}- {url}\n"
+            content += create_markmap_content(value, level + 1)
     return content
 
 def process_data(data):
@@ -101,6 +97,7 @@ if uploaded_file is not None:
     markmap:
       colorFreezeLevel: 2
       color: '#1f77b4'
+      initialExpandLevel: 3
     ---
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
