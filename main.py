@@ -60,9 +60,14 @@ def create_markmap_content(tree, level=0):
 def process_data(data):
     category_tree = {}
     problematic_urls = []
+    
+    # Find all columns that start with 'L' followed by a number
+    level_columns = [col for col in data.columns if col.startswith('L') and col[1:].isdigit()]
+    level_columns.sort(key=lambda x: int(x[1:]))  # Sort columns by their number
+    
     for _, row in data.iterrows():
         url = row['Full URL']
-        category_path = [str(row[f'L{i}']) for i in range(8) if pd.notna(row[f'L{i}'])]
+        category_path = [str(row[col]) for col in level_columns if pd.notna(row[col]) and row[col] != '']
         if not category_path:
             problematic_urls.append(url)
             continue
@@ -73,7 +78,7 @@ def process_data(data):
         st.write(problematic_urls)
     
     return category_tree
-
+    
 # Streamlit UI
 st.title("Hierarchical Visualization of URLs with Counts and Colors")
 
