@@ -3,6 +3,7 @@ import pandas as pd
 from streamlit_markmap import markmap
 import io
 import base64
+import json
 
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
@@ -37,27 +38,29 @@ def load_data(uploaded_file):
 def add_to_tree(tree, path, url):
     current = tree
     for component in path:
-        if component not in current:
-            current[component] = {'_urls': [], '_count': 0}
-        current = current[component]
-        current['_count'] += 1
-    current['_urls'].append(url)
+        if component not in current['children']:
+            current['children'][component] = {'name': component, 'children': {}, 'urls': [], 'count': 0}
+        current = current['children'][component]
+        current['count'] += 1
+    current['urls'].append(url)
 
-def create_markmap_content(tree, level=0):
-    content = ""
-    for key, value in sorted(tree.items()):
-        if key not in ['_urls', '_count']:
-            url_count = value['_count']
-            content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls']:
-                content += f"{'  ' * (level + 1)}- URLs\n"
-                for url in sorted(value['_urls']):
-                    content += f"{'  ' * (level + 2)}- {url}\n"
-            content += create_markmap_content(value, level + 1)
-    return content
+def create_markmap_data(tree):
+    result = []
+    for key, value in sorted(tree['children'].items()):
+        node = {
+            'name': f"{key} ({value['count']})",
+            'children': create_markmap_data(value)
+        }
+        if value['urls']:
+            node['children'].append({
+                'name': 'URLs',
+                'children': [{'name': url} for url in sorted(value['urls'])]
+            })
+        result.append(node)
+    return result
 
 def process_data(data):
-    category_tree = {}
+    category_tree = {'name': 'URL Hierarchy', 'children': {}}
     problematic_urls = []
     for _, row in data.iterrows():
         url = row['Full URL']
@@ -91,16 +94,17 @@ if uploaded_file is not None:
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
 
-    # Create markmap content
-    markmap_content = """
-    ---
-    markmap:
-      colorFreezeLevel: 2
-      color: '#1f77b4'
-      initialExpandLevel: 3
-    ---
-    # URL Hierarchy
-    """ + create_markmap_content(category_tree)
+    # Create markmap data
+    markmap_data = create_markmap_data(category_tree)
+
+    # Convert to JSON
+    markmap_json = json.dumps(markmap_data)
+
+    # Markmap configuration
+    markmap_options = {
+        'colorFreezeLevel': 2,
+        'initialExpandLevel': 3,
+    }
 
     # CSS to control the size of the markmap and hide URLs
     st.markdown("""
@@ -116,7 +120,7 @@ if uploaded_file is not None:
     """, unsafe_allow_html=True)
 
     # Render the markmap
-    markmap(markmap_content)
+    markmap(markmap_json, options=markmap_options)
 
     # Provide user interaction for opening URLs
     st.markdown("""
