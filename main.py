@@ -7,7 +7,32 @@ import base64
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
 
-# ... (keep the download_template and load_data functions as they are)
+def download_template():
+    template_df = pd.DataFrame({
+        'Full URL': ['https://example.com/page1', 'https://example.com/page2'],
+        'L0': ['Category1', 'Category2'],
+        'L1': ['Subcategory1', 'Subcategory2'],
+        'L2': ['SubSubcategory1', 'SubSubcategory2'],
+    })
+    
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        template_df.to_excel(writer, sheet_name='Template', index=False)
+    
+    b64 = base64.b64encode(buffer.getvalue()).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="template.xlsx">Download Excel Template</a>'
+    return href
+
+@st.cache_data
+def load_data(uploaded_file):
+    try:
+        data = pd.read_excel(uploaded_file)
+        data = data.drop_duplicates(subset=['Full URL'])
+        st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
+        return data
+    except Exception as e:
+        st.error(f"An error occurred while loading the data: {str(e)}")
+        st.stop()
 
 def add_to_tree(tree, path, url):
     current = tree
