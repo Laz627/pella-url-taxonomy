@@ -1,24 +1,20 @@
 import streamlit as st
 import pandas as pd
 from streamlit_markmap import markmap
-import base64
+from io import BytesIO
 
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
 
-@st.cache_data
 def load_data(file):
     try:
         data = pd.read_excel(file)
         data = data.drop_duplicates(subset=['Full URL'])
         st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
         return data
-    except FileNotFoundError:
-        st.error(f"File not found. Please check the file path and try again.")
-        st.stop()
     except Exception as e:
         st.error(f"An error occurred while loading the data: {str(e)}")
-        st.stop()
+        return None
 
 def add_to_tree(tree, path, url):
     current = tree
@@ -59,7 +55,7 @@ def process_data(data):
     
     return category_tree
 
-def download_template():
+def create_template_example():
     # Sample DataFrame for template
     template_data = {
         'Full URL': ['http://example.com/page1', 'http://example.com/page2'],
@@ -74,60 +70,72 @@ def download_template():
     }
     template_df = pd.DataFrame(template_data)
     
-    # Convert to Excel
-    excel_file = template_df.to_excel(index=False)
-    b64 = base64.b64encode(excel_file).decode()
-    href = f'<a href="data:application/octet-stream;base64,{b64}" download="URL_Taxonomy_Template.xlsx">Download Template Example</a>'
-    return href
+    # Convert DataFrame to Excel file
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        template_df.to_excel(writer, index=False)
+    output.seek(0)
+    
+    return output
 
 # UI for downloading template and uploading data
-st.sidebar.markdown(download_template(), unsafe_allow_html=True)
+st.sidebar.markdown("## Download Template Example")
+st.sidebar.download_button(
+    label="Download Excel Template",
+    data=create_template_example(),
+    file_name="URL_Taxonomy_Template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
 uploaded_file = st.sidebar.file_uploader("Upload your Excel file", type=["xls", "xlsx"])
 
 if uploaded_file:
     # Load data
     data = load_data(uploaded_file)
+    
+    if data is not None:
+        # Process data into a tree structure based on the category columns
+        category_tree = process_data(data)
 
-    # Process data into a tree structure based on the category columns
-    category_tree = process_data(data)
+        # Create markmap content
+        markmap_content = """
+        ---
+        markmap:
+          colorFreezeLevel: 2
+          color: '#1f77b4'
+          initialExpandLevel: 3
+        ---
+        # URL Hierarchy
+        """ + create_markmap_content(category_tree)
 
-    # Create markmap content
-    markmap_content = """
-    ---
-    markmap:
-      colorFreezeLevel: 2
-      color: '#1f77b4'
-      initialExpandLevel: 3
-    ---
-    # URL Hierarchy
-    """ + create_markmap_content(category_tree)
+        # Streamlit UI
+        st.title("Hierarchical Visualization of URLs with Counts and Colors")
 
-    # Streamlit UI
-    st.title("Hierarchical Visualization of URLs with Counts and Colors")
+        # CSS to control the size of the markmap and hide URLs
+        st.markdown("""
+            <style>
+            .stMarkmap > div {
+                height: 600px;
+                width: 100%;
+            }
+            .markmap-node-text:not(:hover) .mm-url {
+                display: none;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
-    # CSS to control the size of the markmap and hide URLs
-    st.markdown("""
-        <style>
-        .stMarkmap > div {
-            height: 600px;
-            width: 100%;
-        }
-        .markmap-node-text:not(:hover) .mm-url {
-            display: none;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+        # Render the markmap
+        markmap(markmap_content)
 
-    # Render the markmap
-    markmap(markmap_content)
-
-    # Provide user interaction for opening URLs
-    st.markdown("""
-    ### Click on the URLs below to navigate
-    """)
-    selected_url = st.selectbox('Select URL to open', sorted(data['Full URL'].unique()))
-    if st.button('Open URL'):
-        st.write(f"Opening URL: {selected_url}")
-        st.markdown(f'<a href="{selected_url}" target="_blank">Click here to open the URL</a>', unsafe_allow_html=True)
+        # Provide user interaction for opening URLs
+        st.markdown("""
+        ### Click on the URLs below to navigate
+        """)
+        selected_url = st.selectbox('Select URL to open', sorted(data['Full URL'].unique()))
+        if st.button('Open URL'):
+            st.write(f"Opening URL: {selected_url}")
+            st.markdown(f'<a href="{selected_url}" target="_blank">Click here to open the URL</a>', unsafe_allow_html=True)
+    else:
+        st.error("Failed to load data. Please check your file format and content.")
 else:
     st.info("Please upload an Excel file to start.")
