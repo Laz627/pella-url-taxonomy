@@ -9,7 +9,6 @@ def load_data(uploaded_file):
     try:
         data = pd.read_excel(uploaded_file)
         data = data.drop_duplicates(subset=['Full URL'])
-        st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
         return data
     except Exception as e:
         st.error(f"An error occurred while loading the data: {str(e)}")
@@ -63,6 +62,7 @@ uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 if uploaded_file is not None:
     # Load data
     data = load_data(uploaded_file)
+    st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
 
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
@@ -78,21 +78,23 @@ if uploaded_file is not None:
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
 
-    # CSS to control the size of the markmap and hide URLs
-    st.markdown("""
-        <style>
-        .stMarkmap > div {
-            height: 600px;
-            width: 100%;
-        }
-        .markmap-node-text:not(:hover) .mm-url {
-            display: none;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    # Button to render markmap
+    if st.button("Render Markmap"):
+        # CSS to control the size of the markmap and hide URLs
+        st.markdown("""
+            <style>
+            .stMarkmap > div {
+                height: 600px;
+                width: 100%;
+            }
+            .markmap-node-text:not(:hover) .mm-url {
+                display: none;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
-    # Render the markmap
-    markmap(markmap_content)
+        # Render the markmap
+        markmap(markmap_content)
 
     # Provide user interaction for opening URLs
     st.markdown("""
