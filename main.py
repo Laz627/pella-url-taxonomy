@@ -2,9 +2,27 @@ import streamlit as st
 import pandas as pd
 from streamlit_markmap import markmap
 import io
+import time
 
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
+
+# App Title and Credits
+st.title("URL Taxonomy Visualizer")
+st.markdown("**Created by Brandon Lazovic**")
+
+# Instructions for Using the Template
+st.markdown("""
+### Instructions for Using the Template
+1. Download the sample template provided below.
+2. Fill in your data, ensuring the following columns are included:
+   - `Full URL`: The full URL of the page.
+   - `L0` to `L7`: Hierarchical categories for the URL (e.g., Category, Subcategory, etc.).
+3. Upload the filled template using the file uploader below.
+4. The visualization will automatically generate based on the uploaded data.
+
+*Note*: Make sure to maintain the column headers and fill in each level as needed. Leave cells empty if the URL does not go deeper in the hierarchy.
+""")
 
 def load_data(uploaded_file):
     """
@@ -83,10 +101,7 @@ def get_sample_template():
         df[f'L{i}'] = ''
     return df
 
-# Streamlit UI
-st.title("Hierarchical Visualization of URLs with Counts and Colors")
-
-# File uploader
+# Streamlit UI for File Upload
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
 # Download sample template
@@ -106,6 +121,12 @@ if st.button('Download Sample Template'):
 if uploaded_file is not None:
     # Load data
     data = load_data(uploaded_file)
+
+    # Display progress bar while processing data
+    progress_bar = st.progress(0)
+    for i in range(1, 101):
+        time.sleep(0.01)
+        progress_bar.progress(i)
 
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
