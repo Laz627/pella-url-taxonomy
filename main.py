@@ -35,30 +35,14 @@ def load_data(uploaded_file):
         st.warning("No file uploaded. Please upload an Excel file.")
         return None
 
-def process_data(data):
-    required_columns = ['Full URL'] + [f'L{i}' for i in range(1, 9)]
-    missing_columns = [col for col in required_columns if col not in data.columns]
-    
-    if missing_columns:
-        st.error(f"The following required columns are missing from the uploaded file: {', '.join(missing_columns)}")
-        st.error("Please ensure your Excel file has the correct column names and try again.")
-        return None
-
-    category_tree = {}
-    problematic_urls = []
-    for _, row in data.iterrows():
-        url = row['Full URL']
-        category_path = [str(row[f'L{i}']) for i in range(1, 9) if f'L{i}' in row.index and pd.notna(row[f'L{i}']) and row[f'L{i}'] != '']
-        if not category_path:
-            problematic_urls.append(url)
-            continue
-        add_to_tree(category_tree, category_path, url)
-    
-    if problematic_urls:
-        st.warning("The following URLs couldn't be properly categorized:")
-        st.write(problematic_urls)
-    
-    return category_tree
+def add_to_tree(tree, path, url):
+    current = tree
+    for component in path:
+        if component not in current:
+            current[component] = {'_urls': [], '_count': 0}
+        current = current[component]
+        current['_count'] += 1
+    current['_urls'].append(url)
 
 def create_markmap_content(tree, level=0):
     content = ""
@@ -74,14 +58,14 @@ def create_markmap_content(tree, level=0):
                 content += create_markmap_content(value, level + 1)
     return content
 
-def add_to_tree(tree, path, url):
-    current = tree
-    for component in path:
-        if component not in current:
-            current[component] = {'_urls': [], '_count': 0}
-        current = current[component]
-        current['_count'] += 1
-    current['_urls'].append(url)
+def process_data(data):
+    required_columns = ['Full URL'] + [f'L{i}' for i in range(1, 9)]
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    
+    if missing_columns:
+        st.error(f"The following required columns are missing from the uploaded file: {', '.join(missing_columns)}")
+        st.error("Please ensure your Excel file has the correct column names and try again.")
+        return None
 
     category_tree = {}
     problematic_urls = []
@@ -125,10 +109,19 @@ if uploaded_file is not None:
     data = load_data(uploaded_file)
 
     if data is not None:
+        st.write("Sample of the loaded data:")
+        st.write(data.head())
+
+        st.write("Column names:")
+        st.write(data.columns.tolist())
+
         # Process data into a tree structure based on the category columns
         category_tree = process_data(data)
 
         if category_tree is not None:
+            st.write("Category tree structure:")
+            st.write(category_tree)
+
             # Create markmap content
             markmap_content = """
             ---
@@ -139,6 +132,9 @@ if uploaded_file is not None:
             ---
             # URL Hierarchy
             """ + create_markmap_content(category_tree)
+
+            st.write("Markmap content:")
+            st.text(markmap_content)
 
             # CSS to control the size of the markmap and hide URLs
             st.markdown("""
