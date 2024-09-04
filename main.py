@@ -1,79 +1,93 @@
 import streamlit as st
 import pandas as pd
-from bokeh.plotting import figure, from_networkx
-from bokeh.models import Plot, Range1d, Circle, MultiLine, HoverTool
-from bokeh.palettes import Spectral8
-from bokeh.io import show
-import networkx as nx
+from streamlit_markmap import markmap
+import io
+import base64
 
-# Load the data from the Excel file
-@st.cache_data
-def load_data():
-    # Update the file path to match your GitHub repository structure
-    file_path = 'URL_Subfolder_Breakdown_With_Full_URL_and_Topic.xlsm'  # Ensure this path matches where your file is stored
-    data = pd.read_excel(file_path)
-    return data
+# Set page config at the very beginning
+st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
 
-# Create a function to build hierarchical data for Bokeh and NetworkX
-def build_hierarchy_graph(data):
-    # Create a directed graph
-    G = nx.DiGraph()
+def download_template():
+    template_df = pd.DataFrame({
+        'Full URL': ['https://example.com/page1', 'https://example.com/page2'],
+        'L0': ['Category1', 'Category2'],
+        'L1': ['Subcategory1', 'Subcategory2'],
+        'L2': ['SubSubcategory1', 'SubSubcategory2'],
+    })
     
-    # Track added nodes to avoid duplication
-    added_nodes = set()
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        template_df.to_excel(writer, sheet_name='Template', index=False)
+    
+    b64 = base64.b64encode(buffer.getvalue()).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="template.xlsx">Download Excel Template</a>'
+    return href
 
-    # Iterate through each row to build the hierarchy
-    for index, row in data.iterrows():
-        # Root node: Page Topic
-        root = row['Page Topic']
-        if root not in added_nodes:
-            G.add_node(root, title=row['Full URL'])  # Add root node
-            added_nodes.add(root)
+@st.cache_data
+def load_data(uploaded_file):
+    try:
+        data = pd.read_excel(uploaded_file)
+        data = data.drop_duplicates(subset=['Full URL'])
+        st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
+        return data
+    except Exception as e:
+        st.error(f"An error occurred while loading the data: {str(e)}")
+        st.stop()
 
-        # Add hierarchical levels
-        parent = root  # Start with the root node as the parent
-        for level in range(1, 8):
-            level_col = f'L{level}'
-            child = row.get(level_col)
-            if pd.notna(child) and child != '':
-                unique_child = f"{child}_{index}"  # Ensure unique ID for nodes
-                if unique_child not in added_nodes:
-                    G.add_node(unique_child, title=row['Full URL'])  # Add child node
-                    added_nodes.add(unique_child)
-                G.add_edge(parent, unique_child)  # Create edge between parent and child
-                parent = unique_child  # Update parent for the next level
-
-    return G
-
-# Load data
-data = load_data()
-
-# Build hierarchical data graph
-G = build_hierarchy_graph(data)
-
-# Plotting with Bokeh
-plot = Plot(width=800, height=800, x_range=Range1d(-1.1,1.1), y_range=Range1d(-1.1,1.1))
-plot.title.text = "Hierarchical URL Visualization"
-
-# Add node renderer
-graph_renderer = from_networkx(G, nx.spring_layout, scale=2, center=(0,0))
-plot.renderers.append(graph_renderer)
-
-# Add HoverTool to display URL on hover
-hover = HoverTool(tooltips=[("URL", "@title")])
-plot.add_tools(hover)
+# ... (keep all other functions as they are)
 
 # Streamlit UI
-st.title('Hierarchical Visualization of URLs using Bokeh')
+st.title("Hierarchical Visualization of URLs with Counts and Colors")
 
-st.bokeh_chart(plot)
+# Download template
+st.markdown("### Download Template")
+st.markdown(download_template(), unsafe_allow_html=True)
 
-# Provide user interaction for opening URLs
-st.markdown("""
-### Click on the URLs below to navigate
-""")
+# File uploader
+st.markdown("### Upload Your Excel File")
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
-selected_url = st.selectbox('Select URL to open', data['Full URL'].unique())
-if st.button('Open URL'):
-    st.write(f"Opening URL: {selected_url}")
-    st.write(f"<script>window.open('{selected_url}');</script>", unsafe_allow_html=True)
+if uploaded_file is not None:
+    # Load data
+    data = load_data(uploaded_file)
+
+    # Process data into a tree structure based on the category columns
+    category_tree = process_data(data)
+
+    # Create markmap content
+    markmap_content = """
+    ---
+    markmap:
+      colorFreezeLevel: 2
+      color: '#1f77b4'
+      initialExpandLevel: 3
+    ---
+    # URL Hierarchy
+    """ + create_markmap_content(category_tree)
+
+    # CSS to control the size of the markmap and hide URLs
+    st.markdown("""
+        <style>
+        .stMarkmap > div {
+            height: 600px;
+            width: 100%;
+        }
+        .markmap-node-text:not(:hover) .mm-url {
+            display: none;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Render the markmap
+    markmap(markmap_content)
+
+    # Provide user interaction for opening URLs
+    st.markdown("""
+    ### Click on the URLs below to navigate
+    """)
+    selected_url = st.selectbox('Select URL to open', sorted(data['Full URL'].unique()))
+    if st.button('Open URL'):
+        st.write(f"Opening URL: {selected_url}")
+        st.markdown(f'<a href="{selected_url}" target="_blank">Click here to open the URL</a>', unsafe_allow_html=True)
+else:
+    st.info("Please upload an Excel file to visualize the URL hierarchy.")
