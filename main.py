@@ -41,6 +41,11 @@ def create_markmap_content(tree, level=0):
             url_count = value['_count']
             content += f"{'  ' * level}- {key} ({url_count})\n"
             content += create_markmap_content(value, level + 1)
+            # Add URLs as the final nodes
+            if '_urls' in value and value['_urls']:
+                content += f"{'  ' * (level + 1)}- URLs\n"
+                for url in sorted(value['_urls']):
+                    content += f"{'  ' * (level + 2)}- {url}\n"
     return content
 
 def process_data(data):
