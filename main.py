@@ -34,7 +34,44 @@ def load_data(uploaded_file):
         st.error(f"An error occurred while loading the data: {str(e)}")
         st.stop()
 
-# ... (keep all other functions as they are)
+def add_to_tree(tree, path, url):
+    current = tree
+    for component in path:
+        if component not in current:
+            current[component] = {'_urls': [], '_count': 0}
+        current = current[component]
+        current['_count'] += 1
+    current['_urls'].append(url)
+
+def create_markmap_content(tree, level=0):
+    content = ""
+    for key, value in sorted(tree.items()):
+        if key not in ['_urls', '_count']:
+            url_count = value['_count']
+            content += f"{'  ' * level}- {key} ({url_count})\n"
+            if '_urls' in value and value['_urls']:
+                content += f"{'  ' * (level + 1)}- URLs\n"
+                for url in sorted(value['_urls']):
+                    content += f"{'  ' * (level + 2)}- {url}\n"
+            content += create_markmap_content(value, level + 1)
+    return content
+
+def process_data(data):
+    category_tree = {}
+    problematic_urls = []
+    for _, row in data.iterrows():
+        url = row['Full URL']
+        category_path = [str(row[f'L{i}']) for i in range(8) if pd.notna(row[f'L{i}'])]
+        if not category_path:
+            problematic_urls.append(url)
+            continue
+        add_to_tree(category_tree, category_path, url)
+    
+    if problematic_urls:
+        st.warning("The following URLs couldn't be properly categorized:")
+        st.write(problematic_urls)
+    
+    return category_tree
 
 # Streamlit UI
 st.title("Hierarchical Visualization of URLs with Counts and Colors")
