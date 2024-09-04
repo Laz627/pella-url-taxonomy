@@ -32,7 +32,7 @@ def create_markmap_content(tree, level=0):
         if key not in ['_urls', '_count']:
             url_count = value['_count']
             content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls']:
+            if '_urls' in value and value['_urls'] and level >= 2:  # Only show URLs at deeper levels
                 content += f"{'  ' * (level + 1)}- URLs\n"
                 for url in sorted(value['_urls']):
                     content += f"{'  ' * (level + 2)}- {url}\n"
@@ -100,20 +100,17 @@ if uploaded_file is not None:
     markmap:
       colorFreezeLevel: 2
       color: '#1f77b4'
-      initialExpandLevel: 3
+      initialExpandLevel: 2
     ---
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
 
-    # CSS to control the size of the markmap and hide URLs
+    # CSS to control the size of the markmap
     st.markdown("""
         <style>
         .stMarkmap > div {
             height: 600px;
             width: 100%;
-        }
-        .markmap-node-text:not(:hover) .mm-url {
-            display: none;
         }
         </style>
     """, unsafe_allow_html=True)
