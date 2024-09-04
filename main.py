@@ -1,36 +1,21 @@
 import streamlit as st
 import pandas as pd
 from streamlit_markmap import markmap
-import io
 import base64
-import json
 
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
 
-def download_template():
-    template_df = pd.DataFrame({
-        'Full URL': ['https://example.com/page1', 'https://example.com/page2'],
-        'L0': ['Category1', 'Category2'],
-        'L1': ['Subcategory1', 'Subcategory2'],
-        'L2': ['SubSubcategory1', 'SubSubcategory2'],
-    })
-    
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        template_df.to_excel(writer, sheet_name='Template', index=False)
-    
-    b64 = base64.b64encode(buffer.getvalue()).decode()
-    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="template.xlsx">Download Excel Template</a>'
-    return href
-
 @st.cache_data
-def load_data(uploaded_file):
+def load_data(file):
     try:
-        data = pd.read_excel(uploaded_file)
+        data = pd.read_excel(file)
         data = data.drop_duplicates(subset=['Full URL'])
         st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
         return data
+    except FileNotFoundError:
+        st.error(f"File not found. Please check the file path and try again.")
+        st.stop()
     except Exception as e:
         st.error(f"An error occurred while loading the data: {str(e)}")
         st.stop()
@@ -38,29 +23,27 @@ def load_data(uploaded_file):
 def add_to_tree(tree, path, url):
     current = tree
     for component in path:
-        if component not in current['children']:
-            current['children'][component] = {'name': component, 'children': {}, 'urls': [], 'count': 0}
-        current = current['children'][component]
-        current['count'] += 1
-    current['urls'].append(url)
+        if component not in current:
+            current[component] = {'_urls': [], '_count': 0}
+        current = current[component]
+        current['_count'] += 1
+    current['_urls'].append(url)
 
-def create_markmap_data(tree):
-    result = []
-    for key, value in sorted(tree['children'].items()):
-        node = {
-            'name': f"{key} ({value['count']})",
-            'children': create_markmap_data(value)
-        }
-        if value['urls']:
-            node['children'].append({
-                'name': 'URLs',
-                'children': [{'name': url} for url in sorted(value['urls'])]
-            })
-        result.append(node)
-    return result
+def create_markmap_content(tree, level=0):
+    content = ""
+    for key, value in sorted(tree.items()):
+        if key not in ['_urls', '_count']:
+            url_count = value['_count']
+            content += f"{'  ' * level}- {key} ({url_count})\n"
+            if '_urls' in value and value['_urls']:
+                content += f"{'  ' * (level + 1)}- URLs\n"
+                for url in sorted(value['_urls']):
+                    content += f"{'  ' * (level + 2)}- {url}\n"
+            content += create_markmap_content(value, level + 1)
+    return content
 
 def process_data(data):
-    category_tree = {'name': 'URL Hierarchy', 'children': {}}
+    category_tree = {}
     problematic_urls = []
     for _, row in data.iterrows():
         url = row['Full URL']
@@ -76,35 +59,51 @@ def process_data(data):
     
     return category_tree
 
-# Streamlit UI
-st.title("Hierarchical Visualization of URLs with Counts and Colors")
+def download_template():
+    # Sample DataFrame for template
+    template_data = {
+        'Full URL': ['http://example.com/page1', 'http://example.com/page2'],
+        'L1': ['Category1', 'Category1'],
+        'L2': ['Subcategory1', 'Subcategory2'],
+        'L3': [None, 'Subcategory2.1'],
+        'L4': [None, None],
+        'L5': [None, None],
+        'L6': [None, None],
+        'L7': [None, None],
+        'L8': [None, None]
+    }
+    template_df = pd.DataFrame(template_data)
+    
+    # Convert to Excel
+    excel_file = template_df.to_excel(index=False)
+    b64 = base64.b64encode(excel_file).decode()
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="URL_Taxonomy_Template.xlsx">Download Template Example</a>'
+    return href
 
-# Download template
-st.markdown("### Download Template")
-st.markdown(download_template(), unsafe_allow_html=True)
+# UI for downloading template and uploading data
+st.sidebar.markdown(download_template(), unsafe_allow_html=True)
+uploaded_file = st.sidebar.file_uploader("Upload your Excel file", type=["xls", "xlsx"])
 
-# File uploader
-st.markdown("### Upload Your Excel File")
-uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
-
-if uploaded_file is not None:
+if uploaded_file:
     # Load data
     data = load_data(uploaded_file)
 
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
 
-    # Create markmap data
-    markmap_data = create_markmap_data(category_tree)
+    # Create markmap content
+    markmap_content = """
+    ---
+    markmap:
+      colorFreezeLevel: 2
+      color: '#1f77b4'
+      initialExpandLevel: 3
+    ---
+    # URL Hierarchy
+    """ + create_markmap_content(category_tree)
 
-    # Convert to JSON
-    markmap_json = json.dumps(markmap_data)
-
-    # Markmap configuration
-    markmap_options = {
-        'colorFreezeLevel': 2,
-        'initialExpandLevel': 3,
-    }
+    # Streamlit UI
+    st.title("Hierarchical Visualization of URLs with Counts and Colors")
 
     # CSS to control the size of the markmap and hide URLs
     st.markdown("""
@@ -120,7 +119,7 @@ if uploaded_file is not None:
     """, unsafe_allow_html=True)
 
     # Render the markmap
-    markmap(markmap_json, options=markmap_options)
+    markmap(markmap_content)
 
     # Provide user interaction for opening URLs
     st.markdown("""
@@ -131,4 +130,4 @@ if uploaded_file is not None:
         st.write(f"Opening URL: {selected_url}")
         st.markdown(f'<a href="{selected_url}" target="_blank">Click here to open the URL</a>', unsafe_allow_html=True)
 else:
-    st.info("Please upload an Excel file to visualize the URL hierarchy.")
+    st.info("Please upload an Excel file to start.")
