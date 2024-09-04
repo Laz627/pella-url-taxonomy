@@ -7,38 +7,13 @@ import base64
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
 
-def download_template():
-    template_df = pd.DataFrame({
-        'Full URL': ['https://example.com/page1', 'https://example.com/page2'],
-        'L0': ['Category1', 'Category2'],
-        'L1': ['Subcategory1', 'Subcategory2'],
-        'L2': ['SubSubcategory1', 'SubSubcategory2'],
-    })
-    
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        template_df.to_excel(writer, sheet_name='Template', index=False)
-    
-    b64 = base64.b64encode(buffer.getvalue()).decode()
-    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="template.xlsx">Download Excel Template</a>'
-    return href
-
-@st.cache_data
-def load_data(uploaded_file):
-    try:
-        data = pd.read_excel(uploaded_file)
-        data = data.drop_duplicates(subset=['Full URL'])
-        st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
-        return data
-    except Exception as e:
-        st.error(f"An error occurred while loading the data: {str(e)}")
-        st.stop()
+# ... (keep the download_template and load_data functions as they are)
 
 def add_to_tree(tree, path, url):
     current = tree
     for component in path:
         if component not in current:
-            current[component] = {'_urls': [], '_count': 0}
+            current[component] = {'_urls': [], '_count': 0, '_children': {}}
         current = current[component]
         current['_count'] += 1
     current['_urls'].append(url)
@@ -46,14 +21,18 @@ def add_to_tree(tree, path, url):
 def create_markmap_content(tree, level=0):
     content = ""
     for key, value in sorted(tree.items()):
-        if key not in ['_urls', '_count']:
+        if key not in ['_urls', '_count', '_children']:
             url_count = value['_count']
-            content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls']:
-                content += f"{'  ' * (level + 1)}- URLs\n"
-                for url in sorted(value['_urls']):
-                    content += f"{'  ' * (level + 2)}- {url}\n"
-            content += create_markmap_content(value, level + 1)
+            content += f"{'  ' * level}- {key} ({url_count})"
+            if level < 3:  # Only expand up to level 3
+                content += "\n"
+                if '_urls' in value and value['_urls']:
+                    content += f"{'  ' * (level + 1)}- URLs\n"
+                    for url in sorted(value['_urls']):
+                        content += f"{'  ' * (level + 2)}- {url}\n"
+                content += create_markmap_content(value['_children'], level + 1)
+            else:
+                content += " ...\n"  # Indicate there's more content
     return content
 
 def process_data(data):
@@ -97,7 +76,6 @@ if uploaded_file is not None:
     markmap:
       colorFreezeLevel: 2
       color: '#1f77b4'
-      initialExpandLevel: 2
     ---
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
