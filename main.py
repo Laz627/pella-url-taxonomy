@@ -109,19 +109,10 @@ if uploaded_file is not None:
     data = load_data(uploaded_file)
 
     if data is not None:
-        st.write("Sample of the loaded data:")
-        st.write(data.head())
-
-        st.write("Column names:")
-        st.write(data.columns.tolist())
-
         # Process data into a tree structure based on the category columns
         category_tree = process_data(data)
 
         if category_tree is not None:
-            st.write("Category tree structure:")
-            st.write(category_tree)
-
             # Create markmap content
             markmap_content = """
             ---
@@ -132,9 +123,6 @@ if uploaded_file is not None:
             ---
             # URL Hierarchy
             """ + create_markmap_content(category_tree)
-
-            st.write("Markmap content:")
-            st.text(markmap_content)
 
             # CSS to control the size of the markmap and hide URLs
             st.markdown("""
