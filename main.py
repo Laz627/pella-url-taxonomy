@@ -97,7 +97,7 @@ if uploaded_file is not None:
     markmap:
       colorFreezeLevel: 2
       color: '#1f77b4'
-      initialExpandLevel: 3
+      initialExpandLevel: 2
     ---
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
