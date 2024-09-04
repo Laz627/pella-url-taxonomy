@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from streamlit_markmap import markmap
 import io
+import json
 
 # Set page config at the very beginning
 st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
@@ -17,44 +18,33 @@ def load_data(uploaded_file):
         st.error(f"An error occurred while loading the data: {str(e)}")
         st.stop()
 
-def add_to_tree(tree, path, url):
-    current = tree
-    for component in path:
-        if component not in current:
-            current[component] = {'_urls': [], '_count': 0}
-        current = current[component]
-        current['_count'] += 1
-    current['_urls'].append(url)
-
-def create_markmap_content(tree, level=0):
-    content = ""
-    for key, value in sorted(tree.items()):
-        if key not in ['_urls', '_count']:
-            url_count = value['_count']
-            content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls'] and level >= 2:  # Only show URLs at deeper levels
-                content += f"{'  ' * (level + 1)}- URLs\n"
-                for url in sorted(value['_urls']):
-                    content += f"{'  ' * (level + 2)}- {url}\n"
-            content += create_markmap_content(value, level + 1)
-    return content
-
 def process_data(data):
-    category_tree = {}
-    problematic_urls = []
+    hierarchy = {"name": "URL Hierarchy", "children": []}
     for _, row in data.iterrows():
-        url = row['Full URL']
-        category_path = [str(row[f'L{i}']) for i in range(8) if pd.notna(row[f'L{i}'])]
-        if not category_path:
-            problematic_urls.append(url)
-            continue
-        add_to_tree(category_tree, category_path, url)
-    
-    if problematic_urls:
-        st.warning("The following URLs couldn't be properly categorized:")
-        st.write(problematic_urls)
-    
-    return category_tree
+        current = hierarchy
+        for i in range(8):
+            if pd.notna(row[f'L{i}']):
+                category = str(row[f'L{i}'])
+                child = next((c for c in current['children'] if c['name'] == category), None)
+                if child is None:
+                    child = {"name": category, "children": []}
+                    current['children'].append(child)
+                current = child
+            else:
+                break
+        if 'urls' not in current:
+            current['urls'] = []
+        current['urls'].append(row['Full URL'])
+    return hierarchy
+
+def count_items(node):
+    if 'children' in node:
+        count = sum(count_items(child) for child in node['children'])
+        if 'urls' in node:
+            count += len(node['urls'])
+        node['name'] = f"{node['name']} ({count})"
+        return count
+    return 1
 
 # Streamlit UI
 st.title("Hierarchical Visualization of URLs with Counts and Colors")
@@ -91,19 +81,14 @@ if uploaded_file is not None:
     # Load data
     data = load_data(uploaded_file)
 
-    # Process data into a tree structure based on the category columns
-    category_tree = process_data(data)
+    # Process data into a hierarchical structure
+    hierarchy = process_data(data)
+    
+    # Count items and update node names
+    count_items(hierarchy)
 
-    # Create markmap content
-    markmap_content = """
-    ---
-    markmap:
-      colorFreezeLevel: 2
-      color: '#1f77b4'
-      initialExpandLevel: 2
-    ---
-    # URL Hierarchy
-    """ + create_markmap_content(category_tree)
+    # Convert hierarchy to JSON string
+    markmap_content = json.dumps(hierarchy)
 
     # CSS to control the size of the markmap
     st.markdown("""
