@@ -94,8 +94,8 @@ if uploaded_file is not None:
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
 
-    # Create initial markmap content (only top levels)
-    initial_markmap_content = """
+    # Create markmap content
+    markmap_content = """
     ---
     markmap:
       colorFreezeLevel: 2
@@ -103,9 +103,7 @@ if uploaded_file is not None:
       initialExpandLevel: 3
     ---
     # URL Hierarchy
-    """
-    for key, value in sorted(category_tree.items()):
-        initial_markmap_content += f"- {key} ({value['_count']})\n"
+    """ + create_markmap_content(category_tree)
 
     # CSS to control the size of the markmap and hide URLs
     st.markdown("""
@@ -120,21 +118,8 @@ if uploaded_file is not None:
         </style>
     """, unsafe_allow_html=True)
 
-    # Render the initial markmap
-    markmap(initial_markmap_content)
-
-    # Button to load full hierarchy
-    if st.button('Load Full Hierarchy'):
-        full_markmap_content = """
-        ---
-        markmap:
-          colorFreezeLevel: 2
-          color: '#1f77b4'
-          initialExpandLevel: 3
-        ---
-        # URL Hierarchy
-        """ + create_markmap_content(category_tree)
-        markmap(full_markmap_content)
+    # Render the markmap
+    markmap(markmap_content)
 
     # Provide user interaction for opening URLs
     st.markdown("""
