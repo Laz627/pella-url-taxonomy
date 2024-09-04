@@ -41,7 +41,7 @@ def process_data(data):
     problematic_urls = []
     for _, row in data.iterrows():
         url = row['Full URL']
-        category_path = [str(row[f'L{i}']) for i in range(8) if pd.notna(row[f'L{i}'])]
+        category_path = [str(row[col]) for col in ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'] if pd.notna(row[col])]
         if not category_path:
             problematic_urls.append(url)
             continue
@@ -64,8 +64,16 @@ if uploaded_file is not None:
     data = load_data(uploaded_file)
     st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
 
+    # Display first few rows of the data
+    st.write("First few rows of the data:")
+    st.write(data.head())
+
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
+
+    # Display the structure of the category tree (for debugging)
+    st.write("Structure of the category tree:")
+    st.json(category_tree)
 
     # Create markmap content
     markmap_content = """
@@ -77,6 +85,9 @@ if uploaded_file is not None:
     ---
     # URL Hierarchy
     """ + create_markmap_content(category_tree)
+
+    # Display raw markmap content (for debugging)
+    st.text_area("Raw Markmap Content:", markmap_content, height=300)
 
     # Button to render markmap
     if st.button("Render Markmap"):
