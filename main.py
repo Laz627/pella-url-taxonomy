@@ -50,11 +50,12 @@ def create_markmap_content(tree, level=0):
         if key not in ['_urls', '_count']:
             url_count = value['_count']
             content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls']:
-                content += f"{'  ' * (level + 1)}- URLs\n"
-                for url in sorted(value['_urls']):
-                    content += f"{'  ' * (level + 2)}- {url}\n"
-            content += create_markmap_content(value, level + 1)
+            if level < 3:  # Only expand up to level 3
+                if '_urls' in value and value['_urls']:
+                    content += f"{'  ' * (level + 1)}- URLs\n"
+                    for url in sorted(value['_urls']):
+                        content += f"{'  ' * (level + 2)}- {url}\n"
+                content += create_markmap_content(value, level + 1)
     return content
 
 def process_data(data):
@@ -107,7 +108,6 @@ if uploaded_file is not None:
     # Process data into a tree structure based on the category columns
     category_tree = process_data(data)
 
-    # Create markmap content
     markmap_content = """
     ---
     markmap:
