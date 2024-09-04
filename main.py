@@ -77,8 +77,9 @@ def get_sample_template():
         'L0': ['Category1', 'Category2'],
         'L1': ['Subcategory1', 'Subcategory2'],
         'L2': ['Subsubcategory1', 'Subsubcategory2'],
+        'L3': ['Subsubsubcategory1', 'Subsubsubcategory2'],
     })
-    for i in range(3, 8):
+    for i in range(4, 8):
         df[f'L{i}'] = ''
     return df
 
@@ -114,6 +115,7 @@ if uploaded_file is not None:
 ---
 markmap:
   initialExpandLevel: 2  # Ensures only up to the 2nd level nodes are expanded by default
+  colorFreezeLevel: 3  # Keeps the color consistent from the third level onward
 ---
 # URL Hierarchy
 {create_markmap_content(category_tree)}
