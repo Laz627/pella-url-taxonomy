@@ -1,3 +1,63 @@
+import streamlit as st
+import pandas as pd
+from streamlit_markmap import markmap
+import io
+
+# Set page config at the very beginning
+st.set_page_config(layout="wide", page_title="URL Taxonomy Visualizer")
+
+def create_template():
+    df = pd.DataFrame({
+        'Full URL': ['https://example.com/page1', 'https://example.com/page2'],
+        'L1': ['Category1', 'Category1'],
+        'L2': ['Subcategory1', 'Subcategory2'],
+        'L3': ['SubSubcategory1', 'SubSubcategory2'],
+        'L4': ['', ''],
+        'L5': ['', ''],
+        'L6': ['', ''],
+        'L7': ['', ''],
+        'L8': ['', '']
+    })
+    return df
+
+@st.cache_data
+def load_data(uploaded_file):
+    if uploaded_file is not None:
+        try:
+            data = pd.read_excel(uploaded_file)
+            data = data.drop_duplicates(subset=['Full URL'])
+            st.success(f"Data loaded successfully. Shape after removing duplicates: {data.shape}")
+            return data
+        except Exception as e:
+            st.error(f"An error occurred while loading the data: {str(e)}")
+            return None
+    else:
+        st.warning("No file uploaded. Please upload an Excel file.")
+        return None
+
+def add_to_tree(tree, path, url):
+    current = tree
+    for component in path:
+        if component not in current:
+            current[component] = {'_urls': [], '_count': 0}
+        current = current[component]
+        current['_count'] += 1
+    current['_urls'].append(url)
+
+def create_markmap_content(tree, level=0):
+    content = ""
+    for key, value in sorted(tree.items()):
+        if key not in ['_urls', '_count']:
+            url_count = value['_count']
+            content += f"{'  ' * level}- {key} ({url_count})\n"
+            if level < 3:
+                if '_urls' in value and value['_urls']:
+                    content += f"{'  ' * (level + 1)}- URLs\n"
+                    for url in sorted(value['_urls']):
+                        content += f"{'  ' * (level + 2)}- {url}\n"
+                content += create_markmap_content(value, level + 1)
+    return content
+
 def process_data(data):
     required_columns = ['Full URL'] + [f'L{i}' for i in range(1, 9)]
     missing_columns = [col for col in required_columns if col not in data.columns]
@@ -23,7 +83,27 @@ def process_data(data):
     
     return category_tree
 
-# Main logic
+# Streamlit UI
+st.title("Hierarchical Visualization of URLs with Counts and Colors")
+
+# Download template
+st.subheader("Download Template")
+template_df = create_template()
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    template_df.to_excel(writer, index=False, sheet_name='Sheet1')
+buffer.seek(0)
+st.download_button(
+    label="Download Excel Template",
+    data=buffer,
+    file_name="url_taxonomy_template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# File uploader
+st.subheader("Upload Your Excel File")
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
+
 if uploaded_file is not None:
     # Load data
     data = load_data(uploaded_file)
