@@ -49,11 +49,10 @@ def create_markmap_content(tree, level=0):
         if key not in ['_urls', '_count']:
             url_count = value['_count']
             content += f"{'  ' * level}- {key} ({url_count})\n"
-            if level < 3:  # Only show URLs for levels 0, 1, and 2
-                if '_urls' in value and value['_urls']:
-                    content += f"{'  ' * (level + 1)}- URLs\n"
-                    for url in sorted(value['_urls']):
-                        content += f"{'  ' * (level + 2)}- {url}\n"
+            if '_urls' in value and value['_urls']:
+                content += f"{'  ' * (level + 1)}- URLs\n"
+                for url in sorted(value['_urls']):
+                    content += f"{'  ' * (level + 2)}- {url}\n"
             content += create_markmap_content(value, level + 1)
     return content
 
