@@ -1,5 +1,5 @@
 streamlit
 pandas
-streamlit_markmap
-io
-base64
+openpyxl
+xlsxwriter
+streamlit-markmap
