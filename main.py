@@ -29,7 +29,7 @@ def create_markmap_content(tree, level=0):
         if key not in ['_urls', '_count']:
             url_count = value['_count']
             content += f"{'  ' * level}- {key} ({url_count})\n"
-            if '_urls' in value and value['_urls']:
+            if '_urls' in value and value['_urls'] and level >= 2:
                 content += f"{'  ' * (level + 1)}- URLs\n"
                 for url in sorted(value['_urls']):
                     content += f"{'  ' * (level + 2)}- [{url}]({url})\n"
@@ -73,7 +73,7 @@ if uploaded_file is not None:
     markmap:
       colorFreezeLevel: 2
       color: '#1f77b4'
-      initialExpandLevel: 2
+      initialExpandLevel: 1
       maxWidth: 300
     ---
     # URL Hierarchy
