@@ -21,7 +21,7 @@ st.markdown("""
 3. Upload the filled template using the file uploader below.
 4. The visualization will automatically generate based on the uploaded data.
 
-*Note*: Make sure to maintain the column headers and fill in each level as needed. Leave cells empty if the URL does not go deeper in the hierarchy.
+*Note*: Make sure to maintain the column headers and fill in each level as needed. Leave cells empty if the URL does not go deeper in the hierarchy. The script is now robust enough to handle files with fewer than 8 levels (e.g., only up to L4).
 """)
 
 def load_data(uploaded_file):
@@ -66,25 +66,38 @@ def create_markmap_content(tree, level=0):
                     content += f"{'  ' * (level + 2)}- {url}\n"
     return content
 
+# ------------------- FIXED FUNCTION START ------------------- #
+# This function has been updated to prevent the KeyError.
+# It now checks for the existence of 'L' columns instead of assuming they are all present.
 def process_data(data):
     """
     Processes the data to create a hierarchical tree structure.
+    This version is robust against missing 'L' columns.
     """
     category_tree = {}
     problematic_urls = []
+    
+    # Dynamically find which 'L' columns (L0, L1, etc.) exist in the dataframe.
+    # This prevents the KeyError if the uploaded file has fewer than 8 levels.
+    level_columns = sorted([col for col in data.columns if col.startswith('L') and col[1:].isdigit()])
+
     for _, row in data.iterrows():
         url = row['Full URL']
-        category_path = [str(row[f'L{i}']) for i in range(8) if pd.notna(row[f'L{i}'])]
+        
+        # Build the category path using only the existing level columns and non-empty values.
+        category_path = [str(row[col]) for col in level_columns if pd.notna(row[col])]
+        
         if not category_path:
             problematic_urls.append(url)
             continue
         add_to_tree(category_tree, category_path, url)
     
     if problematic_urls:
-        st.warning("The following URLs couldn't be properly categorized:")
+        st.warning("The following URLs couldn't be properly categorized (no category information found):")
         st.write(problematic_urls)
     
     return category_tree
+# -------------------- FIXED FUNCTION END -------------------- #
 
 def get_sample_template():
     """
@@ -97,6 +110,7 @@ def get_sample_template():
         'L2': ['Subsubcategory1', 'Subsubcategory2'],
         'L3': ['Subsubsubcategory1', 'Subsubsubcategory2'],
     })
+    # Still generate a full template as a best practice example
     for i in range(4, 8):
         df[f'L{i}'] = ''
     return df
